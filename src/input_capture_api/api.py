@@ -87,7 +87,7 @@ def create_app(session_manager: SessionManager | None = None) -> FastAPI:
     app = FastAPI(title="Input Capture API", version="0.1.0")
 
     @app.post("/sessions")
-    def start_session(request: SessionCreateRequest) -> SessionResponse:
+    async def start_session(request: SessionCreateRequest) -> SessionResponse:
         """Start a new recording session.
 
         Args:
@@ -97,14 +97,14 @@ def create_app(session_manager: SessionManager | None = None) -> FastAPI:
             Session information
         """
         manager = _check_session_manager(session_manager)
-        session = manager.start_session(request.name, request.metadata)
+        session = await manager.start_session(request.name, request.metadata)
         return SessionResponse(
             id=str(session.session_id),
             name=session.name,
         )
 
     @app.patch("/sessions/{session_id}")
-    def update_session_status(
+    async def update_session_status(
         session_id: str, status_update: SessionStatusUpdate
     ) -> SessionEndResponse:
         """Update a recording session status.
@@ -123,7 +123,7 @@ def create_app(session_manager: SessionManager | None = None) -> FastAPI:
             msg = f"Invalid status: {status_update.status}. Only 'ended' is supported."
             raise HTTPException(status_code=400, detail=msg)
         manager = _check_session_manager(session_manager)
-        manager.end_session(session_id)
+        await manager.end_session(session_id)
         return SessionEndResponse(status="ended")
 
     @app.get("/sessions/{session_id}/events")

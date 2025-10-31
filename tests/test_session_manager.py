@@ -1,7 +1,8 @@
 """Tests for session manager."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from hid_recorder import Event, Recorder, Session
 from ulid import ULID
 
@@ -11,37 +12,70 @@ EXPECTED_EVENT_COUNT = 2
 EXPECTED_SESSION_COUNT = 2
 
 
-def test_start_session() -> None:
+@pytest.mark.asyncio
+async def test_start_session() -> None:
     """Test starting a new session."""
     mock_recorder = MagicMock(spec=Recorder)
     mock_session = MagicMock(spec=Session)
-    mock_session.session_id = ULID()
+    session_ulid = ULID()
+    mock_session.session_id = session_ulid
     mock_session.name = "test-session"
-    mock_recorder.start_session.return_value = mock_session
+
+    # Mock the session context manager
+    mock_handle = MagicMock()
+    mock_handle.session = mock_session
+    mock_handle.hook = MagicMock()
+
+    mock_ctx = AsyncMock()
+    mock_ctx.__aenter__.return_value = mock_handle
+    mock_recorder.session.return_value = mock_ctx
 
     session_manager = SessionManager(recorder=mock_recorder)
-    session = session_manager.start_session(
+    session = await session_manager.start_session(
         name="test-session", metadata={"key": "value"}
     )
 
-    mock_recorder.start_session.assert_called_once_with(
-        "test-session", {"key": "value"}
+    mock_recorder.session.assert_called_once_with(
+        name="test-session", metadata={"key": "value"}
     )
-    assert session.session_id == mock_session.session_id
+    assert session.session_id == session_ulid
     assert session.name == "test-session"
+    # Verify background task was created
+    assert str(session_ulid) in session_manager._sessions  # noqa: SLF001
 
 
-def test_end_session() -> None:
+@pytest.mark.asyncio
+async def test_end_session() -> None:
     """Test ending an existing session."""
     mock_recorder = MagicMock(spec=Recorder)
+    session_ulid = ULID()
+    session_id = str(session_ulid)
+
+    # Mock the session context manager
+    mock_session = MagicMock(spec=Session)
+    mock_session.session_id = session_ulid
+    mock_session.name = "test-session"
+
+    mock_handle = MagicMock()
+    mock_handle.session = mock_session
+    mock_handle.hook = MagicMock()
+
+    mock_ctx = AsyncMock()
+    mock_ctx.__aenter__.return_value = mock_handle
+    mock_recorder.session.return_value = mock_ctx
+
     session_manager = SessionManager(recorder=mock_recorder)
-    session_id = str(ULID())
 
-    session_manager.end_session(session_id)
+    # Start a session first
+    await session_manager.start_session(name="test-session", metadata=None)
 
-    mock_recorder.end_session.assert_called_once()
-    called_ulid = mock_recorder.end_session.call_args[0][0]
-    assert str(called_ulid) == session_id
+    # End the session
+    await session_manager.end_session(session_id)
+
+    # Verify context manager was exited
+    mock_ctx.__aexit__.assert_called_once()
+    # Verify session was removed from internal dict
+    assert session_id not in session_manager._sessions  # noqa: SLF001
 
 
 def test_get_events() -> None:

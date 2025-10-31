@@ -155,3 +155,14 @@ def test_get_session_not_found() -> None:
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
     mock_session_manager.get_session.assert_called_once_with(session_id)
+
+
+def test_session_manager_not_configured() -> None:
+    """Test that endpoints return 500 when SessionManager is not configured."""
+    app = create_app(session_manager=None)
+    client = TestClient(app)
+
+    # Test POST /sessions
+    response = client.post("/sessions", json={"name": "test"})
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert "SessionManager not configured" in response.json()["detail"]

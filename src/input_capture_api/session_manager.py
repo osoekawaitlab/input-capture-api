@@ -1,13 +1,18 @@
 """Session manager for HID recording sessions."""
 
-from typing import Any
+import asyncio
+from typing import TYPE_CHECKING, Any
 
+from hid_interceptor import HIDInterceptor
 from hid_recorder import Event, Recorder, Session
 from ulid import ULID
 
+if TYPE_CHECKING:
+    from contextlib import AbstractAsyncContextManager
+
 
 class SessionManager:
-    """Manages HID recording sessions using hid-recorder."""
+    """Manages HID recording sessions using hid-recorder with HIDInterceptor."""
 
     def __init__(self, recorder: Recorder) -> None:
         """Initialize the session manager.
@@ -16,11 +21,16 @@ class SessionManager:
             recorder: hid-recorder Recorder instance
         """
         self.recorder = recorder
+        # Maps session_id -> (context_manager, task, stop_event)
+        self._sessions: dict[
+            str,
+            tuple[AbstractAsyncContextManager[Any], asyncio.Task[None], asyncio.Event],
+        ] = {}
 
-    def start_session(
+    async def start_session(
         self, name: str, metadata: dict[str, Any] | None = None
     ) -> Session:
-        """Start a new recording session.
+        """Start a new recording session with HIDInterceptor.
 
         Args:
             name: Name of the session
@@ -29,16 +39,39 @@ class SessionManager:
         Returns:
             Session object
         """
-        return self.recorder.start_session(name, metadata)
+        # Manually manage the async context manager
+        ctx = self.recorder.session(name=name, metadata=metadata)
+        handle = await ctx.__aenter__()
 
-    def end_session(self, session_id: str) -> None:
-        """End a recording session.
+        # Start HIDInterceptor in background
+        stop_event = asyncio.Event()
+        interceptor = HIDInterceptor(hooks=[handle.hook])
+        task = asyncio.create_task(interceptor.run(stop_event))
+
+        # Store session info
+        session_id = str(handle.session.session_id)
+        self._sessions[session_id] = (ctx, task, stop_event)
+
+        return handle.session
+
+    async def end_session(self, session_id: str) -> None:
+        """End a recording session and stop HIDInterceptor.
 
         Args:
             session_id: ID of the session to end
         """
         ulid_id = ULID.from_str(session_id)
-        self.recorder.end_session(ulid_id)
+        session_id_str = str(ulid_id)
+
+        # Get session info
+        ctx, task, stop_event = self._sessions.pop(session_id_str)
+
+        # Stop HIDInterceptor
+        stop_event.set()
+        await task
+
+        # Exit context manager
+        await ctx.__aexit__(None, None, None)
 
     def get_events(self, session_id: str) -> list[Event]:
         """Get events for a session.
