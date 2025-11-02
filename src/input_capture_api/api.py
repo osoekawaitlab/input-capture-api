@@ -3,6 +3,7 @@
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from hid_recorder import EventItem, Session
 from pydantic import BaseModel
 
 from input_capture_api.session_manager import SessionManager
@@ -17,11 +18,7 @@ class SessionCreateRequest(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
-class SessionResponse(BaseModel):
-    """Response model for a session."""
-
-    id: str
-    name: str
+SessionResponse = Session
 
 
 class SessionStatusUpdate(BaseModel):
@@ -36,19 +33,10 @@ class SessionEndResponse(BaseModel):
     status: str
 
 
-class EventResponse(BaseModel):
-    """Response model for an event."""
-
-    device: str
-    code: int
-    value: int
-    timestamp: float
-
-
 class EventsResponse(BaseModel):
     """Response model for events list."""
 
-    events: list[EventResponse]
+    events: list[EventItem]
 
 
 class SessionsResponse(BaseModel):
@@ -97,11 +85,7 @@ def create_app(session_manager: SessionManager | None = None) -> FastAPI:
             Session information
         """
         manager = _check_session_manager(session_manager)
-        session = await manager.start_session(request.name, request.metadata)
-        return SessionResponse(
-            id=str(session.session_id),
-            name=session.name,
-        )
+        return await manager.start_session(request.name, request.metadata)
 
     @app.patch("/sessions/{session_id}")
     async def update_session_status(
@@ -138,17 +122,7 @@ def create_app(session_manager: SessionManager | None = None) -> FastAPI:
         """
         manager = _check_session_manager(session_manager)
         events = manager.get_events(session_id)
-        return EventsResponse(
-            events=[
-                EventResponse(
-                    device=event.device,
-                    code=event.code,
-                    value=event.value,
-                    timestamp=event.timestamp,
-                )
-                for event in events
-            ]
-        )
+        return EventsResponse(events=events)
 
     @app.get("/sessions")
     def list_sessions() -> SessionsResponse:
@@ -159,15 +133,7 @@ def create_app(session_manager: SessionManager | None = None) -> FastAPI:
         """
         manager = _check_session_manager(session_manager)
         sessions = manager.list_sessions()
-        return SessionsResponse(
-            sessions=[
-                SessionResponse(
-                    id=str(session.session_id),
-                    name=session.name,
-                )
-                for session in sessions
-            ]
-        )
+        return SessionsResponse(sessions=sessions)
 
     @app.get("/sessions/{session_id}")
     def get_session(session_id: str) -> SessionResponse:
@@ -187,9 +153,6 @@ def create_app(session_manager: SessionManager | None = None) -> FastAPI:
         if session is None:
             msg = f"Session {session_id} not found"
             raise HTTPException(status_code=404, detail=msg)
-        return SessionResponse(
-            id=str(session.session_id),
-            name=session.name,
-        )
+        return session
 
     return app

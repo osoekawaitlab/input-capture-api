@@ -4,7 +4,7 @@ import asyncio
 from typing import TYPE_CHECKING, Any
 
 from hid_interceptor import HIDInterceptor
-from hid_recorder import Event, Recorder, Session
+from hid_recorder import EventItem, Recorder, Session
 from ulid import ULID
 
 if TYPE_CHECKING:
@@ -49,7 +49,7 @@ class SessionManager:
         task = asyncio.create_task(interceptor.run(stop_event))
 
         # Store session info
-        session_id = str(handle.session.session_id)
+        session_id = str(handle.session.id)
         self._sessions[session_id] = (ctx, task, stop_event)
 
         return handle.session
@@ -73,7 +73,7 @@ class SessionManager:
         # Exit context manager
         await ctx.__aexit__(None, None, None)
 
-    def get_events(self, session_id: str) -> list[Event]:
+    def get_events(self, session_id: str) -> list[EventItem]:
         """Get events for a session.
 
         Args:

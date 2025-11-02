@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 from fastapi import status
 from fastapi.testclient import TestClient
-from hid_recorder import Event, Session
+from hid_recorder import EventItem, Session
 from ulid import ULID
 
 from input_capture_api.api import create_app
@@ -19,7 +19,7 @@ def test_start_session() -> None:
     mock_session_manager = MagicMock(spec=SessionManager)
     session_ulid = ULID()
     mock_session = MagicMock(spec=Session)
-    mock_session.session_id = session_ulid
+    mock_session.id = session_ulid
     mock_session.name = "test-session"
     mock_session_manager.start_session.return_value = mock_session
 
@@ -69,18 +69,10 @@ def test_get_events() -> None:
     mock_session_manager = MagicMock(spec=SessionManager)
     mock_events = [
         MagicMock(
-            spec=Event,
-            device="/dev/input/event0",
-            code=30,
-            value=1,
-            timestamp=1234567890.123,
+            spec=EventItem,
         ),
         MagicMock(
-            spec=Event,
-            device="/dev/input/event0",
-            code=30,
-            value=0,
-            timestamp=1234567890.456,
+            spec=EventItem,
         ),
     ]
     mock_session_manager.get_events.return_value = mock_events
@@ -101,10 +93,10 @@ def test_list_sessions() -> None:
     """Test GET /sessions endpoint."""
     mock_session_manager = MagicMock(spec=SessionManager)
     session_1 = MagicMock(spec=Session)
-    session_1.session_id = ULID()
+    session_1.id = ULID()
     session_1.name = "session-1"
     session_2 = MagicMock(spec=Session)
-    session_2.session_id = ULID()
+    session_2.id = ULID()
     session_2.name = "session-2"
     mock_sessions = [session_1, session_2]
     mock_session_manager.list_sessions.return_value = mock_sessions
@@ -125,7 +117,7 @@ def test_get_session() -> None:
     mock_session_manager = MagicMock(spec=SessionManager)
     session_ulid = ULID()
     mock_session = MagicMock(spec=Session)
-    mock_session.session_id = session_ulid
+    mock_session.id = session_ulid
     mock_session.name = "test-session"
     mock_session_manager.get_session.return_value = mock_session
 

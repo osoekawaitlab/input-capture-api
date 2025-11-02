@@ -3,7 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from hid_recorder import Event, Recorder, Session
+from hid_recorder import EventItem, Recorder, Session
 from ulid import ULID
 
 from input_capture_api.session_manager import SessionManager
@@ -18,7 +18,7 @@ async def test_start_session() -> None:
     mock_recorder = MagicMock(spec=Recorder)
     mock_session = MagicMock(spec=Session)
     session_ulid = ULID()
-    mock_session.session_id = session_ulid
+    mock_session.id = session_ulid
     mock_session.name = "test-session"
 
     # Mock the session context manager
@@ -38,7 +38,7 @@ async def test_start_session() -> None:
     mock_recorder.session.assert_called_once_with(
         name="test-session", metadata={"key": "value"}
     )
-    assert session.session_id == session_ulid
+    assert session.id == session_ulid
     assert session.name == "test-session"
     # Verify background task was created
     assert str(session_ulid) in session_manager._sessions  # noqa: SLF001
@@ -53,7 +53,7 @@ async def test_end_session() -> None:
 
     # Mock the session context manager
     mock_session = MagicMock(spec=Session)
-    mock_session.session_id = session_ulid
+    mock_session.id = session_ulid
     mock_session.name = "test-session"
 
     mock_handle = MagicMock()
@@ -82,8 +82,8 @@ def test_get_events() -> None:
     """Test retrieving events for a session."""
     mock_recorder = MagicMock(spec=Recorder)
     mock_events = [
-        MagicMock(spec=Event, device="/dev/input/event0", code=30, value=1),
-        MagicMock(spec=Event, device="/dev/input/event0", code=30, value=0),
+        MagicMock(spec=EventItem, device="/dev/input/event0", code=30, value=1),
+        MagicMock(spec=EventItem, device="/dev/input/event0", code=30, value=0),
     ]
     mock_recorder.get_events.return_value = mock_events
 
@@ -102,10 +102,10 @@ def test_list_sessions() -> None:
     """Test listing all sessions."""
     mock_recorder = MagicMock(spec=Recorder)
     mock_session_1 = MagicMock(spec=Session)
-    mock_session_1.session_id = ULID()
+    mock_session_1.id = ULID()
     mock_session_1.name = "session-1"
     mock_session_2 = MagicMock(spec=Session)
-    mock_session_2.session_id = ULID()
+    mock_session_2.id = ULID()
     mock_session_2.name = "session-2"
     mock_sessions = [mock_session_1, mock_session_2]
     mock_recorder.list_sessions.return_value = mock_sessions
@@ -123,7 +123,7 @@ def test_get_session() -> None:
     mock_recorder = MagicMock(spec=Recorder)
     session_ulid = ULID()
     mock_session = MagicMock(spec=Session)
-    mock_session.session_id = session_ulid
+    mock_session.id = session_ulid
     mock_session.name = "test-session"
     mock_recorder.get_session.return_value = mock_session
 
@@ -135,5 +135,5 @@ def test_get_session() -> None:
     called_ulid = mock_recorder.get_session.call_args[0][0]
     assert str(called_ulid) == session_id
     assert session is not None
-    assert session.session_id == session_ulid
+    assert session.id == session_ulid
     assert session.name == "test-session"
