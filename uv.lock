@@ -284,7 +284,7 @@ wheels = [
 [[package]]
 name = "hid-interceptor"
 version = "0.1.0"
-source = { git = "https://github.com/osoekawaitlab/hid-interceptor#ca8db01d0c77608ef536af0e301da98333b5d77d" }
+source = { git = "https://github.com/osoekawaitlab/hid-interceptor#d45a206e95790ce88733c289b4c3378bc219f7bf" }
 dependencies = [
     { name = "evdev" },
     { name = "pydantic" },

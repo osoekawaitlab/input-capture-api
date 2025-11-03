@@ -1,9 +1,11 @@
 """Tests for session manager."""
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from hid_recorder import EventItem, Recorder, Session
+from pytest_mock import MockerFixture
 from ulid import ULID
 
 from input_capture_api.session_manager import SessionManager
@@ -12,7 +14,28 @@ EXPECTED_EVENT_COUNT = 2
 EXPECTED_SESSION_COUNT = 2
 
 
+@pytest.fixture
+def mock_hid_interceptor(mocker: MockerFixture) -> MagicMock:
+    """Mock HIDInterceptor that sets ready_event immediately."""
+
+    async def mock_run(
+        stop_event: asyncio.Event, ready_event: asyncio.Event | None = None
+    ) -> None:
+        if ready_event is not None:
+            ready_event.set()
+        await stop_event.wait()
+
+    mock_interceptor = MagicMock()
+    mock_interceptor.run = AsyncMock(side_effect=mock_run)
+    mocker.patch(
+        "input_capture_api.session_manager.HIDInterceptor",
+        return_value=mock_interceptor,
+    )
+    return mock_interceptor
+
+
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_hid_interceptor")
 async def test_start_session() -> None:
     """Test starting a new session."""
     mock_recorder = MagicMock(spec=Recorder)
@@ -45,6 +68,7 @@ async def test_start_session() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_hid_interceptor")
 async def test_end_session() -> None:
     """Test ending an existing session."""
     mock_recorder = MagicMock(spec=Recorder)

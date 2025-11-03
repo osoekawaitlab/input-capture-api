@@ -45,8 +45,12 @@ class SessionManager:
 
         # Start HIDInterceptor in background
         stop_event = asyncio.Event()
+        ready_event = asyncio.Event()
         interceptor = HIDInterceptor(hooks=[handle.hook])
-        task = asyncio.create_task(interceptor.run(stop_event))
+        task = asyncio.create_task(interceptor.run(stop_event, ready_event))
+
+        # Wait for HIDInterceptor to be ready before returning
+        await ready_event.wait()
 
         # Store session info
         session_id = str(handle.session.id)
